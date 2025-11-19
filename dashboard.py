@@ -328,7 +328,7 @@ def evaluate_bet(integer_value, home_pts_1h, away_pts_1h, derived_2h_line):
     score_diff = abs(home_pts_1h - away_pts_1h)
 
     # GO if both conditions are true
-    qualifies = (diff_line < 11) and (score_diff >= 6)
+    qualifies = (diff_line >= 6) and (score_diff < 11)
 
     # Lean direction still based on integer vs 2H line
     if integer_value > derived_2h_line:
