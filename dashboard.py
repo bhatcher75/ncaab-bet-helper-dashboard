@@ -585,6 +585,17 @@ TEMPLATE = """
 </body>
 </html>
 """
+@app.route("/test-odds")
+def test_odds():
+    """
+    Simple check page for The Odds API.
+    Go to /test-odds in your browser to see if it works.
+    """
+    try:
+        games = fetch_odds_games_today()
+        return f"OK - got {len(games)} events from The Odds API.", 200
+    except Exception as e:
+        return f"ERROR talking to The Odds API: {e}", 500
 
 @app.route("/", methods=["GET", "POST"])
 def index():
