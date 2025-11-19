@@ -319,16 +319,18 @@ def extract_full_game_total_with_book(event):
 
 def evaluate_bet(integer_value, home_pts_1h, away_pts_1h, derived_2h_line):
     """
-    Apply your rules against the derived 2H line:
+    New GO / NO-GO rules:
 
-      1) (integer - line) > 7 or < -7  <=>  abs(integer - line) >= 7
-      2) abs(home_pts_1h - away_pts_1h) < 10
+      1) abs(integer - 2H line) < 11
+      2) 1st half score diff >= 6
     """
     diff_line = abs(integer_value - derived_2h_line)
     score_diff = abs(home_pts_1h - away_pts_1h)
 
-    qualifies = (diff_line >= 7) and (score_diff < 10)
+    # GO if both conditions are true
+    qualifies = (diff_line < 11) and (score_diff >= 6)
 
+    # Lean direction still based on integer vs 2H line
     if integer_value > derived_2h_line:
         lean = "OVER"
     elif integer_value < derived_2h_line:
@@ -342,6 +344,7 @@ def evaluate_bet(integer_value, home_pts_1h, away_pts_1h, derived_2h_line):
         "score_diff": score_diff,
         "lean": lean,
     }
+
 
 
 # ---------------- DASHBOARD CORE ----------------
