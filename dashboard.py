@@ -596,6 +596,18 @@ def test_odds():
         return f"OK - got {len(games)} events from The Odds API.", 200
     except Exception as e:
         return f"ERROR talking to The Odds API: {e}", 500
+@app.route("/test-ncaa")
+def test_ncaa():
+    """
+    Simple check page for the NCAA scoreboard.
+    Go to /test-ncaa in your browser to see if it works.
+    """
+    try:
+        scoreboard = get_ncaab_scoreboard_for_today()
+        games = scoreboard.get("games", [])
+        return f"OK - got {len(games)} games from the NCAA API.", 200
+    except Exception as e:
+        return f"ERROR talking to NCAA API: {e}", 500
 
 @app.route("/", methods=["GET", "POST"])
 def index():
