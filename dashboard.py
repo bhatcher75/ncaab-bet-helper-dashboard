@@ -493,7 +493,7 @@ TEMPLATE = """
     </style>
 </head>
 <body>
-    <h1>NCAAB Halftime Integer Dashboard</h1>
+    <h1>RVP 2nd Half Picks - Powered by BH </h1>
     <div class="subtitle">Date: {{ today }}</div>
 
     <form method="post">
@@ -505,11 +505,8 @@ TEMPLATE = """
     {% endif %}
 
     <div class="note">
-        Showing only games in 1st half or at halftime.<br>
-        Integer = FGA + (FTA / 2) + TO.
-        Odds source (full-game total): <strong>DraftKings → FanDuel → BetMGM → BetOnline → PointsBet → Caesars → BetRivers → Unibet → WynnBet → Barstool</strong> (first available).<br>
-        Derived 2H line = chosen full-game total − total 1H points.<br>
-        Game qualifies if |Integer − 2H line| ≥ 7 and 1H score diff &lt; 10.
+        Showing only games in 1st Half or at Halftime.<br>
+        
     </div>
 
     <table>
