@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 NCAA_BASE_URL = "https://ncaa-api.henrygd.me"
 
 # Odds API
-ODDS_API_KEY = os.getenv("ODDS_API_KEY", "a5712dc701f3c6ebb31db584979436b7")  # <-- PUT YOUR KEY HERE
+ODDS_API_KEY = os.getenv("ODDS_API_KEY", "eca706581611fc45887be9b5193f7a6d")  # <-- PUT YOUR KEY HERE
 ODDS_BASE_URL = "https://api.the-odds-api.com/v4/sports/basketball_ncaab"
 ODDS_REGIONS = "us"
 ODDS_MARKETS = "totals"   # full-game totals for the main /odds call
