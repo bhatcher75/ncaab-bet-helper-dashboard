@@ -111,7 +111,7 @@ def get_game_play_by_play(game_url_path):
     return data
 
 
-def compute_first_half_stats_from_pbp(pbp_data):
+ddef compute_first_half_stats_from_pbp(pbp_data):
     """
     Compute:
       - FGA (non-FT field goal attempts)
@@ -145,7 +145,7 @@ def compute_first_half_stats_from_pbp(pbp_data):
         desc = play.get("eventDescription") or ""
         if not desc:
             desc = play.get("visitorText") or play.get("homeText") or ""
-        desc_lower = desc.lower()
+        desc_lower = desc.lower().strip()
 
         # Keep scores updated as we walk the plays
         last_home_score = play.get("homeScore", last_home_score)
@@ -165,21 +165,31 @@ def compute_first_half_stats_from_pbp(pbp_data):
                 fta += 1
 
         # ---------- FIELD GOAL ATTEMPTS (non-FT FGA) ----------
+        # Only count if it is a real attempt, not a summary/stat line
         has_shot_word = any(k in desc_lower for k in SHOT_KEYWORDS)
-        if has_shot_word and "free throw" not in desc_lower:
+        is_summary_line = (
+            ("team" in desc_lower and "by" in desc_lower) or
+            ("points" in desc_lower and "off" in desc_lower)
+        )
+
+        if has_shot_word and "free throw" not in desc_lower and not is_summary_line:
             fga += 1
 
-        # ---------- TURNOVERS (refined) ----------
+        # ---------- TURNOVERS (refined with summary skip) ----------
         if "turnover" in desc_lower:
-            # Ignore non-event commentary about turnovers
+
+            # Skip commentary / aggregated stats
             if any(bad in desc_lower for bad in TURNOVER_IGNORE_PHRASES):
                 continue
 
-            # Count only if it looks like an actual event
-            positive_match = any(p in desc_lower for p in TURNOVER_POSITIVE_PHRASES)
+            # Skip fake lines like "turnover alabama by alabama"
+            words = desc_lower.split()
+            if len(words) != len(set(words)):  # contains duplicate team word
+                continue
 
-            # Fallback: a line starting with "turnover" is almost always an event
-            starts_with_turnover = desc_lower.strip().startswith("turnover")
+            # Actual turnover triggers
+            positive_match = any(p in desc_lower for p in TURNOVER_POSITIVE_PHRASES)
+            starts_with_turnover = desc_lower.startswith("turnover")
 
             if positive_match or starts_with_turnover:
                 turnovers += 1
@@ -194,6 +204,7 @@ def compute_first_half_stats_from_pbp(pbp_data):
         "away_pts_1h": last_visitor_score,
         "integer": integer_value,
     }
+
 
 
 # ---------------- ODDS API HELPERS ----------------
