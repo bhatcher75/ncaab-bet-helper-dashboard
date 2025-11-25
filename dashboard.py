@@ -165,11 +165,14 @@ def compute_first_half_stats_from_pbp(pbp_data):
                 fta += 1
 
         # ---------- FIELD GOAL ATTEMPTS (non-FT FGA) ----------
-        # Only count if it is a real attempt, not a summary/stat line
         has_shot_word = any(k in desc_lower for k in SHOT_KEYWORDS)
+
+        # Skip garbage summary lines like "2 pointer missed by denver's denver"
+        duplicate_team_word = len(desc_lower.split()) != len(set(desc_lower.split()))
         is_summary_line = (
             ("team" in desc_lower and "by" in desc_lower) or
-            ("points" in desc_lower and "off" in desc_lower)
+            ("points" in desc_lower and "off" in desc_lower) or
+            duplicate_team_word
         )
 
         if has_shot_word and "free throw" not in desc_lower and not is_summary_line:
@@ -204,6 +207,7 @@ def compute_first_half_stats_from_pbp(pbp_data):
         "away_pts_1h": last_visitor_score,
         "integer": integer_value,
     }
+
 
 
 
