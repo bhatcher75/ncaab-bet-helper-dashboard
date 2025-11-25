@@ -78,16 +78,21 @@ app = Flask(__name__)
 # ---------------- NCAA HELPERS ----------------
 
 def get_ncaab_scoreboard_for_today():
-    """Fetch today's NCAA D1 men's basketball scoreboard (US Eastern time)."""
-    # Use America/New_York so Render doesn't flip to 'tomorrow' at UTC midnight
-    eastern_now = datetime.now(ZoneInfo("America/New_York"))
-    d = eastern_now.date()  # get the date in Eastern time
+    """Fetch today's NCAA D1 men's basketball scoreboard (try Eastern, fallback to system date)."""
+    try:
+        # Try to use America/New_York (works on Render)
+        eastern_now = datetime.now(ZoneInfo("America/New_York"))
+        d = eastern_now.date()
+    except Exception:
+        # If that fails (like on your local machine), use the system date
+        d = date.today()
 
     year, month, day = d.year, d.month, d.day
     url = f"{NCAA_BASE_URL}/scoreboard/basketball-men/d1/{year}/{month:02d}/{day:02d}/all-conf"
     resp = requests.get(url, timeout=10)
     resp.raise_for_status()
     return resp.json()
+
 
 
 
