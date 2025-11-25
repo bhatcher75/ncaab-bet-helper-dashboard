@@ -111,7 +111,7 @@ def get_game_play_by_play(game_url_path):
     return data
 
 
-ddef compute_first_half_stats_from_pbp(pbp_data):
+def compute_first_half_stats_from_pbp(pbp_data):
     """
     Compute:
       - FGA (non-FT field goal attempts)
