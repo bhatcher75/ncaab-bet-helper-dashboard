@@ -109,11 +109,11 @@ def get_game_play_by_play(game_url_path):
 
 def compute_first_half_stats_from_pbp(pbp_data):
     """
-    Compute:
-      - FGA (non-FT field goal attempts)
-      - FTA (free throw attempts)
-      - TO (turnovers)
-      - 1H scores
+    Simple version:
+
+      - FGA: any non-FT line with a shot keyword (jumper, layup, 2 pointer, etc.)
+      - FTA: count based on free-throw wording
+      - TO: any turnover line that looks like a real event
       - integer = FGA + (FTA / 2) + TO
     """
     periods = pbp_data.get("periods", [])
@@ -137,38 +137,15 @@ def compute_first_half_stats_from_pbp(pbp_data):
     last_home_score = 0
     last_visitor_score = 0
 
-    # Strong duplicate prevention
-    seen_events = set()
-
     for play in plays:
         desc = play.get("eventDescription") or ""
         if not desc:
             desc = play.get("visitorText") or play.get("homeText") or ""
-        desc_lower = desc.lower().strip()
-
-        home_score = play.get("homeScore", last_home_score)
-        visitor_score = play.get("visitorScore", last_visitor_score)
-
-        # ---- DUPLICATE EVENT DETECTION ----
-        # Key 1: description + scores
-        event_key_basic = (desc_lower, home_score, visitor_score)
-        # Key 2: description only (covers “same line twice in a row” cases)
-        event_key_desc_only = desc_lower
-
-        if event_key_basic in seen_events or event_key_desc_only in seen_events:
-            # exact (or effectively exact) duplicate of a play we've already processed
-            last_home_score = home_score
-            last_visitor_score = visitor_score
-            continue
-
-        seen_events.add(event_key_basic)
-        seen_events.add(event_key_desc_only)
+        desc_lower = desc.lower()
 
         # Keep scores updated as we walk the plays
-        last_home_score = home_score
-        last_visitor_score = visitor_score
-
-        words = desc_lower.split()
+        last_home_score = play.get("homeScore", last_home_score)
+        last_visitor_score = play.get("visitorScore", last_visitor_score)
 
         # ---------- FREE THROWS (FTA) ----------
         if "free throw" in desc_lower:
@@ -183,45 +160,22 @@ def compute_first_half_stats_from_pbp(pbp_data):
             else:
                 fta += 1
 
-        # ---------- SUMMARY / GARBAGE PATTERN DETECTION ----------
-        duplicate_word = len(words) != len(set(words))
-
-        # pattern like "denver's denver", "arizona's arizona"
-        team_repeat_pattern = False
-        for i in range(len(words) - 1):
-            w = words[i]
-            nxt = words[i + 1]
-            if w.endswith("'s"):
-                root = w[:-2]
-                if root and root == nxt:
-                    team_repeat_pattern = True
-                    break
-
         # ---------- FIELD GOAL ATTEMPTS (non-FT FGA) ----------
         has_shot_word = any(k in desc_lower for k in SHOT_KEYWORDS)
-        is_summary_line = (
-            ("team" in desc_lower and "by" in desc_lower) or
-            ("points" in desc_lower and "off" in desc_lower) or
-            duplicate_word or
-            team_repeat_pattern
-        )
-
-        if has_shot_word and "free throw" not in desc_lower and not is_summary_line:
+        if has_shot_word and "free throw" not in desc_lower:
             fga += 1
 
-        # ---------- TURNOVERS (refined with summary skip) ----------
+        # ---------- TURNOVERS ----------
         if "turnover" in desc_lower:
-
-            # Skip commentary / aggregated stats
+            # Ignore non-event commentary about turnovers
             if any(bad in desc_lower for bad in TURNOVER_IGNORE_PHRASES):
                 continue
 
-            # Skip fake lines like "turnover alabama by alabama" or "turnover by denver's denver"
-            if duplicate_word or team_repeat_pattern:
-                continue
-
+            # Count only if it looks like an actual event
             positive_match = any(p in desc_lower for p in TURNOVER_POSITIVE_PHRASES)
-            starts_with_turnover = desc_lower.startswith("turnover")
+
+            # Fallback: a line starting with "turnover" is almost always an event
+            starts_with_turnover = desc_lower.strip().startswith("turnover")
 
             if positive_match or starts_with_turnover:
                 turnovers += 1
@@ -534,6 +488,13 @@ TEMPLATE = """
         .error { color: red; margin-top: 10px; }
         .note { color: #666; font-size: 13px; margin-top: 10px; }
     </style>
+
+    <!-- Auto-refresh every 60,000 ms = 60 seconds -->
+    <script>
+        setInterval(function () {
+            window.location.reload();
+        }, 60000);
+    </script>
 </head>
 <body>
     <h1>RVP 2nd Half Picks - Powered by BH </h1>
@@ -549,6 +510,8 @@ TEMPLATE = """
 
     <div class="note">
         Showing only games in 1st Half or at Halftime.<br>
+        Integer = FGA + (FTA / 2) + TO.<br>
+        Game qualifies if |Integer − Derived 2H line| ≥ 6 and 1H score diff &lt; 11.
     </div>
 
     <table>
@@ -681,116 +644,6 @@ def list_games():
         lines.append(f"{away_short} @ {home_short} | {game_path}")
 
     return "<br>".join(lines)
-
-
-@app.route("/debug-denver-arizona")
-def debug_denver_arizona():
-    """Debug FGA/TO parsing for Denver @ Arizona."""
-    game_path = "/game/6502811"   # confirmed path from /list-games
-
-    pbp = get_game_play_by_play(game_path)
-    if not pbp:
-        return "No PBP data for this game.", 500
-
-    periods = pbp.get("periods", [])
-    first_half = None
-    for p in periods:
-        if str(p.get("periodNumber")) == "1":
-            first_half = p
-            break
-
-    if first_half is None:
-        return "1st half PBP missing.", 500
-
-    plays = first_half.get("playbyplayStats", [])
-    output = []
-    fga = fta = turnovers = 0
-
-    seen_events = set()
-
-    for i, play in enumerate(plays):
-        desc = play.get("eventDescription") or play.get("visitorText") or play.get("homeText") or ""
-        desc_lower = desc.lower().strip()
-
-        home_score = play.get("homeScore", 0)
-        visitor_score = play.get("visitorScore", 0)
-
-        # Duplicate detection (same as compute func)
-        event_key_basic = (desc_lower, home_score, visitor_score)
-        event_key_desc_only = desc_lower
-        duplicate_for_counts = event_key_basic in seen_events or event_key_desc_only in seen_events
-        if not duplicate_for_counts:
-            seen_events.add(event_key_basic)
-            seen_events.add(event_key_desc_only)
-
-        words = desc_lower.split()
-
-        # FREE THROWS
-        fta_flag = 0
-        if "free throw" in desc_lower and not duplicate_for_counts:
-            if "both free throws" in desc_lower:
-                fta += 2
-                fta_flag = 2
-            elif "all three free throws" in desc_lower or "all 3 free throws" in desc_lower:
-                fta += 3
-                fta_flag = 3
-            elif "three free throws" in desc_lower or "3 free throws" in desc_lower:
-                fta += 3
-                fta_flag = 3
-            elif "two free throws" in desc_lower or "2 free throws" in desc_lower:
-                fta += 2
-                fta_flag = 2
-            else:
-                fta += 1
-                fta_flag = 1
-
-        # Garbage detection
-        duplicate_word = len(words) != len(set(words))
-        team_repeat_pattern = False
-        for j in range(len(words) - 1):
-            w = words[j]
-            nxt = words[j + 1]
-            if w.endswith("'s"):
-                root = w[:-2]
-                if root and root == nxt:
-                    team_repeat_pattern = True
-                    break
-
-        # FGA
-        has_shot_word = any(k in desc_lower for k in SHOT_KEYWORDS)
-        is_summary_line = (
-            ("team" in desc_lower and "by" in desc_lower) or
-            ("points" in desc_lower and "off" in desc_lower) or
-            duplicate_word or
-            team_repeat_pattern
-        )
-
-        fga_flag = False
-        if (
-            has_shot_word
-            and "free throw" not in desc_lower
-            and not is_summary_line
-            and not duplicate_for_counts
-        ):
-            fga_flag = True
-            fga += 1
-
-        # TURNOVERS
-        to_flag = False
-        if "turnover" in desc_lower and not duplicate_for_counts:
-            if not any(bad in desc_lower for bad in TURNOVER_IGNORE_PHRASES):
-                if not (duplicate_word or team_repeat_pattern):
-                    positive = any(p in desc_lower for p in TURNOVER_POSITIVE_PHRASES)
-                    starts = desc_lower.startswith("turnover")
-                    if positive or starts:
-                        to_flag = True
-                        turnovers += 1
-
-        output.append(
-            f"[{i}] {desc} | FGA? {fga_flag} | TO? {to_flag} | RUNNING: FGA={fga}, FTA={fta}, TO={turnovers}"
-        )
-
-    return "<br>".join(output)
 
 
 @app.route("/", methods=["GET", "POST"])
